@@ -1,0 +1,9 @@
+ESCALA SEMANAL — PWA PARA GITHUB PAGES
+
+1. Extraia o ZIP. Abra CONVERTER_NO_NAVEGADOR.html com duplo clique.
+2. Escolha o HTML original que você enviou e clique GERAR INDEX.HTML.
+3. Envie o index.html gerado, manifest.webmanifest, sw.js e a pasta icons para a raiz do repositório GitHub.
+4. Settings > Pages > Deploy from a branch > main > /(root) > Save.
+5. Abra o link no Chrome do celular > Instalar app / Adicionar à tela inicial.
+
+O aplicativo salva dados localmente no navegador e não sincroniza entre aparelhos.
