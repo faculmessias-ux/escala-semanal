@@ -1,0 +1,1261 @@
+<!doctype html><html><head>
+<meta charset=utf8>
+<meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2b7a3d">
+<meta name="description" content="Gerencie a escala semanal de equipes e gere imagens JPG">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Escala">
+<meta name="format-detection" content="telephone=no">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+</head><body>
+<title>Escala Semanal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Carlito:wght@400;700&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: week settings on top, editable green-grid sheet blocks (like the paper schedule) in a scroll frame, export bar and JPG preview below */
+:root {
+  --bg: #f1f4f0;
+  --surface: #ffffff;
+  --fg: #16201a;
+  --muted: #5a685e;
+  --line: #d3dbd3;
+  --accent: #2b7a3d;
+  --accent-fg: #ffffff;
+  --paper: #ffffff;
+  --sheet-head: #3b9147;
+  --sheet-name: #2b7a3d;
+  --sheet-cell: #ffffff;
+  --sheet-alt: #e8e8e8;
+  --sheet-fg: #1c1c1c;
+  --sheet-line: #c4c4c4;
+  --danger: #a43228;
+  --font-ui: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sheet: "Carlito", Calibri, "Segoe UI", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1511;
+    --surface: #18201a;
+    --fg: #e7eee8;
+    --muted: #9aa99e;
+    --line: #2b362e;
+    --accent: #52b066;
+    --accent-fg: #0a140d;
+    --danger: #ee8a7f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1511;
+  --surface: #18201a;
+  --fg: #e7eee8;
+  --muted: #9aa99e;
+  --line: #2b362e;
+  --accent: #52b066;
+  --accent-fg: #0a140d;
+  --danger: #ee8a7f;
+  color-scheme: dark;
+}
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.45;
+  padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+h1 { font-size: 1.5rem; line-height: 1.2; margin: 0; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+.lead { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
+
+.settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field label, .field .lbl { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.field input[type="date"], .field input[type="text"], .field select {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  min-width: 0;
+  width: 100%;
+}
+.team-row { display: flex; gap: 6px; align-items: stretch; }
+.team-row select { flex: 1 1 auto; min-width: 0; }
+.team-row .btn-ghost.del {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--danger);
+  font: 600 0.78rem var(--font-ui);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.team-row .btn-ghost.del:hover:not(:disabled) { border-color: var(--danger); }
+.team-row .btn-ghost.del:disabled { opacity: 0.4; cursor: not-allowed; color: var(--muted); border-color: var(--line); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; padding-top: 4px; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+.frame {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  overflow-x: auto;
+}
+.sheet { min-width: 760px; display: flex; flex-direction: column; gap: 6px; font-family: var(--font-sheet); color: var(--sheet-fg); }
+.sheet-title { font-family: var(--font-sheet); font-weight: 700; font-size: 1.25rem; color: var(--sheet-name); margin: 0 0 4px; min-height: 0; }
+.block { display: flex; flex-direction: column; gap: 3px; margin-bottom: 14px; }
+.block-tools { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.block-date { display: flex; align-items: center; gap: 6px; font: 600 0.75rem var(--font-ui); color: #5f5f5f; }
+.block-date input {
+  font: 400 0.85rem var(--font-ui);
+  color: #1c1c1c;
+  background: #ffffff;
+  color-scheme: light;
+  border: 1px solid var(--sheet-line);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+.block-actions { display: flex; gap: 4px; }
+.btn-ghost {
+  font: 600 0.75rem var(--font-ui);
+  color: #6b6b6b;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.btn-ghost:hover { color: var(--danger); border-color: var(--sheet-line); }
+.btn-ghost.dup:hover { color: var(--accent); }
+.grid {
+  display: grid;
+  grid-template-columns: 132px 46px repeat(5, minmax(104px, 1fr));
+  grid-auto-rows: 32px;
+  gap: 1px;
+  background: var(--paper);
+}
+.hd {
+  background: var(--sheet-head);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nm, .ap { background: var(--sheet-name); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.nm { grid-row: span 2; padding: 2px 6px; }
+.nm textarea {
+  font: 700 15px/1.15 var(--font-sheet);
+  color: #fff;
+  background: transparent;
+  border: 0;
+  resize: none;
+  text-align: center;
+  text-transform: uppercase;
+  width: 100%;
+  height: 100%;
+  padding: 10px 0 0;
+  overflow: hidden;
+}
+.ap { font-size: 14px; }
+.cell { background: var(--sheet-cell); border: 0; outline: 0; box-shadow: inset 0 0 0 1px var(--sheet-line); }
+.cell.alt { background: var(--sheet-alt); }
+.cell select {
+  font: 400 14px var(--font-sheet);
+  color: var(--sheet-fg);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: center;
+  text-align-last: center;
+  text-transform: uppercase;
+  width: 100%;
+  height: 100%;
+  padding: 0 6px;
+  cursor: pointer;
+}
+.cell select option { color: #1c1c1c; background: #ffffff; text-transform: uppercase; }
+.cell select option[value="__new__"] { color: #2b7a3d; font-style: italic; }
+.cell:focus-within, .nm:focus-within { box-shadow: inset 0 0 0 2px var(--accent); }
+.nm textarea:focus, .cell select:focus { outline: none; }
+
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn {
+  font: 600 0.95rem var(--font-ui);
+  border-radius: 7px;
+  padding: 10px 16px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.danger { background: var(--danger); color: #ffffff; border-color: var(--danger); }
+.btn.danger:hover { filter: brightness(1.08); border-color: var(--danger); }
+.btn:focus-visible, .btn-ghost:focus-visible, .field input:focus-visible, .field select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.spacer { flex: 1 1 auto; }
+.status-row { display: flex; align-items: baseline; gap: 12px; }
+.status { color: var(--muted); font-size: 0.9rem; min-height: 1.3em; flex: 1 1 auto; }
+.saved { font-size: 0.82rem; color: var(--accent); opacity: 0; transition: opacity 0.25s ease; white-space: nowrap; }
+.saved.show { opacity: 1; }
+
+.preview { display: flex; flex-direction: column; gap: 8px; }
+.preview[hidden] { display: none; }
+.preview h2 { font-size: 1rem; margin: 0; }
+.preview .note { color: var(--muted); font-size: 0.9rem; margin: 0; }
+.preview img { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+
+/* Modal (substitui window.confirm / window.prompt) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+  animation: modalFade 0.18s ease-out;
+}
+.modal-overlay[hidden] { display: none !important; }
+@keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
+.modal-box {
+  background: var(--surface);
+  color: var(--fg);
+  border-radius: 10px;
+  padding: 20px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-family: var(--font-ui);
+}
+.modal-box h2 { margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+.modal-box p { margin: 0; color: var(--muted); font-size: 0.95rem; line-height: 1.45; white-space: pre-line; }
+.modal-box label { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.modal-box label span { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.modal-box input[type="text"] {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 11px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.modal-box input[type="text"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(20, 32, 24, 0.94);
+  color: #ffffff;
+  padding: 11px 20px;
+  border-radius: 8px;
+  font: 500 0.9rem var(--font-ui);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 1100;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* PWA install banner */
+.install-banner {
+  position: fixed;
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  z-index: 950;
+  font: 500 0.88rem var(--font-ui);
+  animation: installIn 0.25s ease-out;
+}
+.install-banner[hidden] { display: none !important; }
+@keyframes installIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.install-icon { font-size: 1.3rem; flex: 0 0 auto; }
+.install-text { flex: 1 1 auto; min-width: 0; line-height: 1.35; }
+.install-action {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font: 600 0.85rem var(--font-ui);
+  cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.install-action:hover { filter: brightness(1.08); }
+.install-close {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+/* PWA running standalone: slight padding tweak */
+@media (display-mode: standalone) {
+  body { padding-top: max(20px, env(safe-area-inset-top, 20px)); }
+}
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Escala Semanal</h1>
+    <p class="lead">Adicione cada equipe com a sua segunda-feira, escolha o local em AM e PM e gere a imagem em JPG. Use <strong>Próxima semana</strong> para avançar rapidamente a escala toda.</p>
+  </header>
+
+  <section class="settings" aria-label="Configurações da semana">
+    <div class="field">
+      <label for="title">Título da imagem (opcional)</label>
+      <input type="text" id="title" placeholder="Ex.: Escala 02/11 a 06/11">
+    </div>
+  </section>
+
+  <section class="frame" aria-label="Planilha da escala">
+    <div class="sheet" id="sheet"></div>
+  </section>
+
+  <section class="settings" aria-label="Adicionar à escala">
+    <div class="field">
+      <label for="teamSel">Equipe</label>
+      <div class="team-row">
+        <select id="teamSel"></select>
+        <button class="btn-ghost del" id="deleteTeam" type="button" title="Excluir equipe da lista" aria-label="Excluir equipe da lista" disabled>Excluir</button>
+      </div>
+    </div>
+    <div class="field" id="teamNewWrap" hidden>
+      <label for="teamNew">Nome da nova equipe</label>
+      <input type="text" id="teamNew" placeholder="Ex.: Mestre Fulano" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="addDate">Segunda-feira da semana</label>
+      <input type="date" id="addDate">
+    </div>
+    <div class="field">
+      <span class="lbl">&nbsp;</span>
+      <button class="btn primary" id="addBlock" type="button">Adicionar à escala</button>
+    </div>
+  </section>
+
+  <div class="bar" aria-label="Ações da escala">
+    <button class="btn" id="shiftBack" type="button" title="Recuar todas as semanas em 7 dias">◀ Semana anterior</button>
+    <button class="btn" id="shiftFwd" type="button" title="Avançar todas as semanas em 7 dias">Próxima semana ▶</button>
+    <button class="btn" id="clearCells" type="button">Limpar células</button>
+    <span class="spacer"></span>
+    <button class="btn primary" id="exportBtn" type="button">Gerar JPG</button>
+  </div>
+  <div class="status-row">
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+    <span class="saved" id="saved" aria-hidden="true">Salvo</span>
+  </div>
+
+  <section class="preview" id="preview" hidden>
+    <h2>Imagem gerada</h2>
+    <p class="note" id="previewNote">Se o download não iniciar automaticamente, use o botão abaixo ou pressione e segure a imagem para salvar.</p>
+    <img id="previewImg" alt="Prévia da escala semanal em JPG">
+    <div class="bar">
+      <a class="btn primary" id="downloadLink" download>Baixar imagem</a>
+    </div>
+  </section>
+</div>
+
+<!-- Modal customizado -->
+<div class="modal-overlay" id="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h2 id="modalTitle"></h2>
+    <p id="modalMessage"></p>
+    <label id="modalInputWrap" hidden>
+      <span id="modalInputLabel"></span>
+      <input type="text" id="modalInput" autocomplete="off">
+    </label>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="modalCancel">Cancelar</button>
+      <button type="button" class="btn primary" id="modalOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- PWA install banner -->
+<div class="install-banner" id="installBanner" hidden>
+  <div class="install-icon">📱</div>
+  <div class="install-text" id="installText">Instale o Escala Semanal para acesso rápido</div>
+  <button class="install-action" id="installBtn" type="button">Instalar</button>
+  <button class="install-close" id="installDismiss" type="button" aria-label="Fechar">×</button>
+</div>
+
+<script>
+/* ============================================================
+   PWA SETUP
+   - Gera ícones PNG via canvas (192 e 512)
+   - Injeta manifest como Blob URL
+   - Adiciona apple-touch-icon e favicon
+   - Registra service worker (se ./sw.js existir)
+   - Mostra botão de instalação quando beforeinstallprompt dispara
+   - Instruções manuais para iOS
+   ============================================================ */
+
+
+/* Service worker (opcional — só registra se ./sw.js existir) */
+(async function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  if (location.protocol === 'file:') return;
+  try {
+    var r = await fetch('./sw.js', { method: 'HEAD' });
+    if (!r.ok) return;
+    await navigator.serviceWorker.register('./sw.js');
+  } catch (e) { /* offline sem SW: sem cache */ }
+})();
+
+/* Install prompt */
+(function setupInstallPrompt() {
+  var banner = document.getElementById('installBanner');
+  var installBtn = document.getElementById('installBtn');
+  var dismissBtn = document.getElementById('installDismiss');
+  var installText = document.getElementById('installText');
+  var deferredPrompt = null;
+
+  function hideBanner() {
+    banner.hidden = true;
+    try { localStorage.setItem('escala-install-dismissed', String(Date.now())); } catch (e) {}
+  }
+  function dismissedRecently() {
+    try {
+      var t = +localStorage.getItem('escala-install-dismissed') || 0;
+      return Date.now() - t < 7 * 24 * 60 * 60 * 1000;
+    } catch (e) { return false; }
+  }
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (!dismissedRecently()) {
+      installText.textContent = 'Instale o Escala Semanal para acesso rápido';
+      installBtn.hidden = false;
+      banner.hidden = false;
+    }
+  });
+
+  installBtn.addEventListener('click', async function () {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    try { await deferredPrompt.userChoice; } catch (e) {}
+    deferredPrompt = null;
+    hideBanner();
+  });
+  dismissBtn.addEventListener('click', hideBanner);
+
+  window.addEventListener('appinstalled', function () {
+    banner.hidden = true;
+    deferredPrompt = null;
+  });
+
+  // iOS: mostra instruções (Safari iOS não dispara beforeinstallprompt)
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (isIOS && !isStandalone && !dismissedRecently()) {
+    installText.textContent = 'Toque em Compartilhar (□↑) e escolha "Adicionar à Tela Inicial"';
+    installBtn.hidden = true;
+    banner.hidden = false;
+  }
+})();
+
+/* ============================================================
+   APP PRINCIPAL
+   ============================================================ */
+(function () {
+  var WD = ['SEG', 'TER', 'QUA', 'QUI', 'SEX'];
+  var MON = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  var KEY = 'escala-semanal-v1';
+  var OPTIONS = ['RAVENA', 'ESPANHA', 'DANTE', 'TULLE', 'TIBRE', 'CERRADO', 'JERIVAS', 'CEREJEIRAS', 'PITANGUEIRAS', 'ALECRINS', 'PAMPAS', 'FERIADO', 'FERIAS'];
+  var NEW_OPT = '__new__';
+  var DEFAULT_TEAMS = ['Gabriel - Gi', 'Mestre Osvaldo', 'Mestre Geremias', 'Mestre Badu'];
+
+  function sample() {
+    return {
+      title: '',
+      custom: [],
+      teams: DEFAULT_TEAMS.slice(),
+      blocks: [
+        { name: 'Gabriel - Gi', weekStart: '2026-11-02', am: ['FERIADO', 'DANTE', 'ESPANHA', 'DANTE', 'CEREJEIRAS'], pm: ['FERIADO', 'DANTE', 'CERRADO', 'DANTE', 'JERIVAS'] },
+        { name: 'Mestre Osvaldo', weekStart: '2026-11-02', am: ['', 'TULLE', 'PITANGUEIRAS', 'CEREJEIRAS', 'TIBRE'], pm: ['', 'TULLE', 'JERIVAS', 'CERRADO', 'TULLE'] },
+        { name: 'Mestre Geremias', weekStart: '2026-11-02', am: ['', 'JERIVAS', 'JERIVAS', 'JERIVAS', 'JERIVAS'], pm: ['', 'CEREJEIRAS', 'DANTE', 'CEREJEIRAS', 'DANTE'] },
+        { name: 'Mestre Badu', weekStart: '2026-11-02', am: ['', 'CERRADO', 'CERRADO', 'CERRADO', 'CERRADO'], pm: ['', 'CERRADO', 'ESPANHA', 'CERRADO', 'ESPANHA'] }
+      ]
+    };
+  }
+
+  var state = sample();
+  try {
+    var saved = localStorage.getItem(KEY);
+    if (saved) {
+      var p = JSON.parse(saved);
+      if (p && Array.isArray(p.blocks)) state = p;
+    }
+  } catch (e) {}
+  state.custom = Array.isArray(state.custom) ? state.custom : [];
+  if (!Array.isArray(state.teams)) {
+    state.teams = DEFAULT_TEAMS.slice();
+    state.blocks.forEach(function (b) {
+      var n = (b.name || '').trim();
+      if (n && state.teams.indexOf(n) < 0) state.teams.push(n);
+    });
+  }
+  state.fmt = 'wd';
+  state.grayPM = true;
+  state.blocks.forEach(function (b) {
+    b.weekStart = b.weekStart || toISO(snapToMonday(new Date()));
+    ['am', 'pm'].forEach(function (k) {
+      b[k] = (b[k] || []).map(function (v) {
+        v = (v || '').toLocaleUpperCase('pt-BR');
+        return v === 'JERIVÁS' ? 'JERIVAS' : v;
+      });
+      while (b[k].length < 5) b[k].push('');
+    });
+  });
+
+  var $ = function (id) { return document.getElementById(id); };
+  var sheet = $('sheet');
+  var statusEl = $('status');
+  var savedEl = $('saved');
+  var downloads = null;
+  var saveTimer = null;
+  var flashTimer = null;
+  var toastTimer = null;
+
+  function persist() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      try {
+        localStorage.setItem(KEY, JSON.stringify(state));
+        savedEl.classList.add('show');
+        clearTimeout(flashTimer);
+        flashTimer = setTimeout(function () { savedEl.classList.remove('show'); }, 1400);
+      } catch (e) {
+        setStatus('Aviso: não foi possível salvar no navegador (armazenamento cheio ou bloqueado).');
+      }
+    }, 200);
+  }
+  function setStatus(t) { statusEl.textContent = t || ''; }
+  function showToast(msg) {
+    var el = $('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2800);
+  }
+
+  /* Modal customizado */
+  var modalFinish = null;
+  $('modal').addEventListener('click', function (e) {
+    if (e.target === $('modal') && modalFinish) modalFinish(null);
+  });
+  function showModal(opts) {
+    return new Promise(function (resolve) {
+      var overlay = $('modal');
+      var resolved = false;
+
+      function finish(val) {
+        if (resolved) return;
+        resolved = true;
+        modalFinish = null;
+        overlay.hidden = true;
+        document.body.style.overflow = '';
+        document.removeEventListener('keydown', onKey);
+        resolve(val);
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') { e.preventDefault(); finish(null); }
+        else if (e.key === 'Enter' && (!opts.input || document.activeElement === $('modalInput'))) { e.preventDefault(); doOk(); }
+      }
+      function doOk() {
+        if (opts.input) finish($('modalInput').value);
+        else finish(true);
+      }
+
+      $('modalTitle').textContent = opts.title || '';
+      $('modalMessage').textContent = opts.message || '';
+      $('modalMessage').hidden = !opts.message;
+
+      var inputWrap = $('modalInputWrap');
+      if (opts.input) {
+        inputWrap.hidden = false;
+        $('modalInputLabel').textContent = opts.input.label || 'Valor';
+        $('modalInput').value = opts.input.value || '';
+        $('modalInput').placeholder = opts.input.placeholder || '';
+        $('modalInput').maxLength = opts.input.maxlength || 60;
+      } else {
+        inputWrap.hidden = true;
+      }
+
+      $('modalCancel').textContent = opts.cancelText || 'Cancelar';
+      $('modalOk').textContent = opts.okText || 'OK';
+      $('modalOk').className = 'btn ' + (opts.danger ? 'danger' : 'primary');
+
+      $('modalOk').onclick = doOk;
+      $('modalCancel').onclick = function () { finish(null); };
+
+      modalFinish = finish;
+      overlay.hidden = false;
+      document.body.style.overflow = 'hidden';
+      document.addEventListener('keydown', onKey);
+
+      setTimeout(function () {
+        if (opts.input) { $('modalInput').focus(); $('modalInput').select(); }
+        else { $('modalOk').focus(); }
+      }, 30);
+    });
+  }
+
+  function parseDate(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+    if (!m) return null;
+    return new Date(+m[1], +m[2] - 1, +m[3]);
+  }
+  function toISO(d) {
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + mm + '-' + dd;
+  }
+  function snapToMonday(d) {
+    var dow = d.getDay();
+    var back = (dow + 6) % 7;
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() - back);
+  }
+  function shiftWeek(block, delta) {
+    var d = parseDate(block.weekStart);
+    if (!d) return;
+    block.weekStart = toISO(new Date(d.getFullYear(), d.getMonth(), d.getDate() + delta));
+  }
+  function dayLabels(ws) {
+    var start = parseDate(ws) || snapToMonday(new Date());
+    var out = [];
+    for (var i = 0; i < 5; i++) {
+      var d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      var dd = String(d.getDate()).padStart(2, '0');
+      var mm = String(d.getMonth() + 1).padStart(2, '0');
+      out.push(state.fmt === 'short' ? (d.getDate() + '-' + MON[d.getMonth()]) : (WD[i] + ' ' + dd + '/' + mm));
+    }
+    return out;
+  }
+
+  var mctx = document.createElement('canvas').getContext('2d');
+  function fitSize(text, maxW, base, min, weight) {
+    var size = base;
+    while (size > min) {
+      mctx.font = weight + ' ' + size + 'px Carlito, Calibri, Arial, sans-serif';
+      if (mctx.measureText(text).width <= maxW) break;
+      size -= 0.5;
+    }
+    return size;
+  }
+  function fitInputs() {
+    var inputs = sheet.querySelectorAll('.cell select');
+    for (var i = 0; i < inputs.length; i++) {
+      var el = inputs[i];
+      var w = el.clientWidth - 14;
+      if (w <= 0) continue;
+      var t = (el.value || '').toLocaleUpperCase('pt-BR');
+      el.style.fontSize = fitSize(t, w, 14, 8, 400) + 'px';
+    }
+  }
+
+  function localList(cur) {
+    var list = OPTIONS.concat(state.custom || []);
+    if (cur && list.indexOf(cur) < 0) list.push(cur);
+    return list;
+  }
+
+  function fillCellSelect(sel, cur) {
+    sel.textContent = '';
+    var opts = [''].concat(localList(cur));
+    opts.forEach(function (o) {
+      var op = document.createElement('option');
+      op.value = o;
+      op.textContent = o || '—';
+      sel.appendChild(op);
+    });
+    var nw = document.createElement('option');
+    nw.value = NEW_OPT;
+    nw.textContent = '+ Novo local…';
+    sel.appendChild(nw);
+    sel.value = cur || '';
+  }
+
+  function render() {
+    sheet.textContent = '';
+    if (state.title) {
+      var h = document.createElement('div');
+      h.className = 'sheet-title';
+      h.textContent = state.title;
+      sheet.appendChild(h);
+    }
+    state.blocks.forEach(function (b, bi) {
+      var labels = dayLabels(b.weekStart);
+      var block = document.createElement('div');
+      block.className = 'block';
+
+      var tools = document.createElement('div');
+      tools.className = 'block-tools';
+      var dw = document.createElement('label');
+      dw.className = 'block-date';
+      dw.appendChild(document.createTextNode('Segunda-feira'));
+      var di = document.createElement('input');
+      di.type = 'date';
+      di.value = b.weekStart;
+      di.setAttribute('aria-label', 'Segunda-feira da equipe ' + (bi + 1));
+      di.addEventListener('change', function () {
+        var d = parseDate(di.value);
+        if (!d) return;
+        b.weekStart = toISO(snapToMonday(d));
+        persist();
+        render();
+        setStatus('Semana da equipe alterada.');
+      });
+      dw.appendChild(di);
+      tools.appendChild(dw);
+
+      var actions = document.createElement('div');
+      actions.className = 'block-actions';
+      var dup = document.createElement('button');
+      dup.type = 'button';
+      dup.className = 'btn-ghost dup';
+      dup.textContent = 'Duplicar p/ próxima semana';
+      dup.setAttribute('aria-label', 'Duplicar equipe para a próxima semana');
+      dup.addEventListener('click', function () {
+        var copy = { name: b.name, weekStart: b.weekStart, am: b.am.slice(), pm: b.pm.slice() };
+        shiftWeek(copy, 7);
+        state.blocks.splice(bi + 1, 0, copy);
+        persist();
+        render();
+        setStatus('Equipe duplicada para a semana de ' + copy.weekStart.split('-').reverse().join('/') + '.');
+      });
+      actions.appendChild(dup);
+
+      var rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'btn-ghost';
+      rm.textContent = 'Remover do bloco';
+      rm.setAttribute('aria-label', 'Remover este bloco da escala (equipe ' + (b.name || '') + ')');
+      rm.addEventListener('click', function () {
+        state.blocks.splice(bi, 1);
+        persist();
+        render();
+        setStatus('Bloco removido da escala.');
+      });
+      actions.appendChild(rm);
+      tools.appendChild(actions);
+      block.appendChild(tools);
+
+      var g = document.createElement('div');
+      g.className = 'grid';
+
+      var e1 = document.createElement('div');
+      var e2 = document.createElement('div');
+      e1.style.background = 'transparent';
+      e2.style.background = 'transparent';
+      g.appendChild(e1);
+      g.appendChild(e2);
+      labels.forEach(function (l) {
+        var hd = document.createElement('div');
+        hd.className = 'hd';
+        hd.textContent = l;
+        g.appendChild(hd);
+      });
+
+      var nm = document.createElement('div');
+      nm.className = 'nm';
+      var ta = document.createElement('textarea');
+      ta.value = b.name;
+      ta.maxLength = 60;
+      ta.setAttribute('aria-label', 'Nome da equipe ' + (bi + 1));
+      ta.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') ev.preventDefault(); });
+      ta.addEventListener('input', function () { b.name = ta.value; persist(); });
+      ta.addEventListener('change', function () {
+        var n = (b.name || '').trim();
+        if (n && state.teams.indexOf(n) < 0) state.teams.push(n);
+        refreshTeams();
+        persist();
+      });
+      nm.appendChild(ta);
+      g.appendChild(nm);
+
+      [['AM', 'am'], ['PM', 'pm']].forEach(function (pair, ri) {
+        var ap = document.createElement('div');
+        ap.className = 'ap';
+        ap.textContent = pair[0];
+        g.appendChild(ap);
+        for (var c = 0; c < 5; c++) {
+          (function (c) {
+            var cell = document.createElement('div');
+            cell.className = 'cell' + (ri === 1 && state.grayPM ? ' alt' : '');
+            var inp = document.createElement('select');
+            fillCellSelect(inp, b[pair[1]][c] || '');
+            inp.setAttribute('aria-label', labels[c] + ' ' + pair[0] + ', equipe ' + (bi + 1));
+            inp.addEventListener('change', async function () {
+              if (inp.value === NEW_OPT) {
+                var prev = b[pair[1]][c] || '';
+                inp.value = prev;
+                var raw = await showModal({
+                  title: 'Novo local',
+                  message: 'Digite o nome do local. Ele ficará disponível em todas as células.',
+                  input: { label: 'Nome do local', value: '', placeholder: 'Ex.: Nome do local', maxlength: 30 },
+                  okText: 'Adicionar'
+                });
+                if (raw === null) return;
+                var name = (raw || '').trim().toLocaleUpperCase('pt-BR');
+                if (!name) return;
+                if (OPTIONS.indexOf(name) < 0 && state.custom.indexOf(name) < 0) state.custom.push(name);
+                b[pair[1]][c] = name;
+                fillCellSelect(inp, name);
+                var ww = inp.clientWidth - 14;
+                inp.style.fontSize = fitSize(name, ww, 14, 8, 400) + 'px';
+                persist();
+                return;
+              }
+              b[pair[1]][c] = inp.value;
+              var w = inp.clientWidth - 14;
+              inp.style.fontSize = fitSize((inp.value || '').toLocaleUpperCase('pt-BR'), w, 14, 8, 400) + 'px';
+              persist();
+            });
+            cell.appendChild(inp);
+            g.appendChild(cell);
+          })(c);
+        }
+      });
+
+      block.appendChild(g);
+      sheet.appendChild(block);
+    });
+
+    if (!state.blocks.length) {
+      var empty = document.createElement('p');
+      empty.style.cssText = 'margin:8px 0;color:#6b6b6b;font-family:Public Sans,system-ui,sans-serif;font-size:14px';
+      empty.textContent = 'Nenhuma equipe na escala. Use "Adicionar à escala" para começar.';
+      sheet.appendChild(empty);
+    }
+    fitInputs();
+    refreshTeams();
+  }
+
+  function updateDeleteBtn() {
+    var sel = $('teamSel');
+    var btn = $('deleteTeam');
+    var v = sel.value;
+    btn.disabled = !v || v === NEW_OPT;
+  }
+
+  function refreshTeams() {
+    var sel = $('teamSel');
+    var prev = sel.value;
+    sel.textContent = '';
+    state.teams.forEach(function (n) {
+      var o = document.createElement('option');
+      o.value = n;
+      o.textContent = n;
+      sel.appendChild(o);
+    });
+    var other = document.createElement('option');
+    other.value = NEW_OPT;
+    other.textContent = 'Outra equipe…';
+    sel.appendChild(other);
+    if (prev && (state.teams.indexOf(prev) >= 0 || prev === NEW_OPT)) sel.value = prev;
+    $('teamNewWrap').hidden = sel.value !== NEW_OPT;
+    updateDeleteBtn();
+  }
+
+  $('teamSel').addEventListener('change', function () {
+    var isNew = $('teamSel').value === NEW_OPT;
+    $('teamNewWrap').hidden = !isNew;
+    if (isNew) $('teamNew').focus();
+    updateDeleteBtn();
+  });
+
+  $('deleteTeam').addEventListener('click', async function () {
+    var name = $('teamSel').value;
+    if (!name || name === NEW_OPT) return;
+    if (state.teams.indexOf(name) < 0) {
+      setStatus('Equipe não encontrada na lista. Recarregue a página.');
+      return;
+    }
+    var used = state.blocks.filter(function (b) { return (b.name || '').trim() === name; });
+    var msg = 'A equipe "' + name + '" será removida da lista de equipes.';
+    if (used.length) {
+      msg += '\n\nEla também está em ' + used.length + ' bloco(s) da escala, que serão removidos junto.';
+    }
+    var ok = await showModal({
+      title: 'Excluir equipe',
+      message: msg,
+      okText: used.length ? 'Excluir tudo' : 'Excluir',
+      danger: true
+    });
+    if (!ok) return;
+    state.teams = state.teams.filter(function (n) { return n !== name; });
+    if (used.length) {
+      state.blocks = state.blocks.filter(function (b) { return (b.name || '').trim() !== name; });
+    }
+    persist();
+    render();
+    var finalMsg = 'Equipe "' + name + '" excluída' + (used.length ? ' e ' + used.length + ' bloco(s) removido(s).' : '.');
+    setStatus(finalMsg);
+    showToast(finalMsg);
+  });
+
+  $('teamNew').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); $('addBlock').click(); }
+  });
+  function syncControls() {
+    $('title').value = state.title || '';
+    var last = state.blocks[state.blocks.length - 1];
+    var base = last ? parseDate(last.weekStart) : null;
+    $('addDate').value = toISO(base || snapToMonday(new Date()));
+  }
+  $('title').addEventListener('input', function (e) {
+    state.title = e.target.value;
+    var t = sheet.querySelector('.sheet-title');
+    if (state.title) {
+      if (!t) {
+        t = document.createElement('div');
+        t.className = 'sheet-title';
+        sheet.insertBefore(t, sheet.firstChild);
+      }
+      t.textContent = state.title;
+    } else if (t) {
+      t.remove();
+    }
+    persist();
+  });
+  $('addBlock').addEventListener('click', function () {
+    var picked = $('teamSel').value;
+    var name = picked === NEW_OPT ? ($('teamNew').value || '').trim() : picked;
+    if (!name) {
+      setStatus('Digite o nome da nova equipe.');
+      $('teamNew').focus();
+      return;
+    }
+    if (state.teams.indexOf(name) < 0) state.teams.push(name);
+    var d = parseDate($('addDate').value);
+    if (!d) {
+      setStatus('Escolha a segunda-feira da semana.');
+      return;
+    }
+    var ws = toISO(snapToMonday(d));
+    $('addDate').value = ws;
+    state.blocks.push({ name: name, weekStart: ws, am: ['', '', '', '', ''], pm: ['', '', '', '', ''] });
+    persist();
+    render();
+    if (picked === NEW_OPT) {
+      $('teamNew').value = '';
+      $('teamSel').value = name;
+      $('teamNewWrap').hidden = true;
+    }
+    setStatus(name + ' adicionada à escala (semana de ' + ws.split('-').reverse().join('/') + ').');
+    var blocks = sheet.querySelectorAll('.block');
+    if (blocks.length) blocks[blocks.length - 1].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  $('clearCells').addEventListener('click', async function () {
+    var ok = await showModal({
+      title: 'Limpar células',
+      message: 'Todas as células AM/PM de todas as equipes serão esvaziadas. Os nomes das equipes serão mantidos.',
+      okText: 'Limpar tudo',
+      danger: true
+    });
+    if (!ok) return;
+    state.blocks.forEach(function (b) { b.am = ['', '', '', '', '']; b.pm = ['', '', '', '', '']; });
+    persist();
+    render();
+    var msg = 'Células limpas. Os nomes das equipes foram mantidos.';
+    setStatus(msg);
+    showToast(msg);
+  });
+  $('shiftBack').addEventListener('click', function () {
+    if (!state.blocks.length) { setStatus('Adicione uma equipe antes de navegar pelas semanas.'); return; }
+    state.blocks.forEach(function (b) { shiftWeek(b, -7); });
+    var ad = parseDate($('addDate').value);
+    if (ad) $('addDate').value = toISO(new Date(ad.getFullYear(), ad.getMonth(), ad.getDate() - 7));
+    persist();
+    render();
+    setStatus('Todas as semanas recuadas em 7 dias.');
+  });
+  $('shiftFwd').addEventListener('click', function () {
+    if (!state.blocks.length) { setStatus('Adicione uma equipe antes de navegar pelas semanas.'); return; }
+    state.blocks.forEach(function (b) { shiftWeek(b, 7); });
+    var ad = parseDate($('addDate').value);
+    if (ad) $('addDate').value = toISO(new Date(ad.getFullYear(), ad.getMonth(), ad.getDate() + 7));
+    persist();
+    render();
+    setStatus('Todas as semanas avançadas em 7 dias.');
+  });
+  window.addEventListener('resize', fitInputs);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitInputs);
+
+  function wrapLines(ctx, text, maxW) {
+    var words = text.split(/\s+/).filter(Boolean);
+    var lines = [];
+    var cur = '';
+    words.forEach(function (w) {
+      var t = cur ? cur + ' ' + w : w;
+      if (ctx.measureText(t).width <= maxW || !cur) cur = t;
+      else { lines.push(cur); cur = w; }
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  }
+
+  function computeTitleLines(title, maxW) {
+    if (!title) return [];
+    mctx.font = '700 22px Carlito, Calibri, Arial, sans-serif';
+    var lines = wrapLines(mctx, title, maxW);
+    if (lines.length > 2) {
+      lines = lines.slice(0, 2);
+      lines[1] = lines[1] + '…';
+    }
+    return lines;
+  }
+
+  function drawSchedule() {
+    var S = 2;
+    var PAD = 14, NAMEW = 150, APW = 48, DAYW = 150, RH = 30, HH = 28, GAP = 22;
+    var width = PAD * 2 + NAMEW + APW + DAYW * 5;
+    var titleLines = computeTitleLines(state.title, width - PAD * 2);
+    var titleH = titleLines.length ? titleLines.length * 26 + 8 : 0;
+    var n = state.blocks.length;
+    var height = PAD * 2 + titleH + (n ? n * (HH + RH * 2) + Math.max(0, n - 1) * GAP : 60);
+
+    var cv = document.createElement('canvas');
+    cv.width = width * S;
+    cv.height = height * S;
+    var ctx = cv.getContext('2d');
+    ctx.scale(S, S);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+
+    var HEAD = '#3b9147', NAME = '#2b7a3d', LINE = '#c4c4c4', ALT = '#e8e8e8', FG = '#1c1c1c';
+    var FF = 'Carlito, Calibri, Arial, sans-serif';
+    var y = PAD;
+
+    if (titleLines.length) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = NAME;
+      ctx.font = '700 22px ' + FF;
+      titleLines.forEach(function (ln, i) {
+        ctx.fillText(ln, PAD, y + 18 + i * 26);
+      });
+      ctx.textAlign = 'center';
+      y += titleH;
+    }
+    if (!n) {
+      ctx.fillStyle = '#6b6b6b';
+      ctx.font = '400 16px ' + FF;
+      ctx.fillText('Escala sem equipes', width / 2, height / 2);
+    }
+
+    state.blocks.forEach(function (b) {
+      var labels = dayLabels(b.weekStart);
+      var x0 = PAD;
+      var xd = x0 + NAMEW + APW;
+
+      for (var i = 0; i < 5; i++) {
+        var x = xd + i * DAYW;
+        ctx.fillStyle = HEAD;
+        ctx.fillRect(x, y, DAYW, HH);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 0.5, y + 0.5, DAYW - 1, HH - 1);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 15px ' + FF;
+        ctx.fillText(labels[i], x + DAYW / 2, y + HH / 2 + 1);
+      }
+
+      var by = y + HH;
+      ctx.fillStyle = NAME;
+      ctx.fillRect(x0, by, NAMEW, RH * 2);
+      ctx.strokeStyle = '#ffffff';
+      ctx.strokeRect(x0 + 0.5, by + 0.5, NAMEW - 1, RH * 2 - 1);
+      ctx.fillStyle = '#ffffff';
+      var nameText = (b.name || '').toLocaleUpperCase('pt-BR');
+      var nsize = 15;
+      ctx.font = '700 ' + nsize + 'px ' + FF;
+      var lines = wrapLines(ctx, nameText, NAMEW - 14);
+      while (lines.length > 2 && nsize > 9) {
+        nsize -= 1;
+        ctx.font = '700 ' + nsize + 'px ' + FF;
+        lines = wrapLines(ctx, nameText, NAMEW - 14);
+      }
+      if (lines.length > 2) {
+        lines = lines.slice(0, 2);
+        lines[1] = lines[1] + '…';
+      }
+      var lh = nsize + 3;
+      var top = by + RH - (lines.length * lh) / 2 + lh / 2;
+      lines.forEach(function (ln, li) { ctx.fillText(ln, x0 + NAMEW / 2, top + li * lh + 1); });
+
+      [['AM', b.am], ['PM', b.pm]].forEach(function (pair, ri) {
+        var ry = by + ri * RH;
+        ctx.fillStyle = NAME;
+        ctx.fillRect(x0 + NAMEW, ry, APW, RH);
+        ctx.strokeStyle = '#ffffff';
+        ctx.strokeRect(x0 + NAMEW + 0.5, ry + 0.5, APW - 1, RH - 1);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 14px ' + FF;
+        ctx.fillText(pair[0], x0 + NAMEW + APW / 2, ry + RH / 2 + 1);
+
+        for (var c = 0; c < 5; c++) {
+          var cx = xd + c * DAYW;
+          ctx.fillStyle = (ri === 1 && state.grayPM) ? ALT : '#ffffff';
+          ctx.fillRect(cx, ry, DAYW, RH);
+          ctx.strokeStyle = LINE;
+          ctx.strokeRect(cx + 0.5, ry + 0.5, DAYW - 1, RH - 1);
+          var t = (pair[1][c] || '').toLocaleUpperCase('pt-BR');
+          if (t) {
+            var sz = fitSize(t, DAYW - 14, 14, 8, 400);
+            ctx.font = '400 ' + sz + 'px ' + FF;
+            ctx.fillStyle = FG;
+            ctx.fillText(t, cx + DAYW / 2, ry + RH / 2 + 1);
+          }
+        }
+      });
+      y += HH + RH * 2 + GAP;
+    });
+    return cv;
+  }
+
+  function fileName() {
+    var tag = 'semana';
+    if (state.blocks.length) {
+      var d = parseDate(state.blocks[0].weekStart);
+      if (d) tag = toISO(d);
+    }
+    var slug = (state.title || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+    return 'escala' + (slug ? '-' + slug : '') + '-' + tag + '.jpg';
+  }
+
+  function toBlob(cv) {
+    return new Promise(function (resolve, reject) {
+      cv.toBlob(function (b) { b ? resolve(b) : reject(new Error('Falha ao gerar a imagem.')); }, 'image/jpeg', 0.95);
+    });
+  }
+
+  $('exportBtn').addEventListener('click', async function () {
+    var btn = $('exportBtn');
+    btn.disabled = true;
+    setStatus('Gerando imagem…');
+    try {
+      if (document.fonts && document.fonts.load) {
+        try { await Promise.all([document.fonts.load('700 15px Carlito'), document.fonts.load('400 14px Carlito')]); } catch (e) {}
+      }
+      var cv = drawSchedule();
+      var dataUrl = cv.toDataURL('image/jpeg', 0.95);
+      $('previewImg').src = dataUrl;
+      var dl = $('downloadLink');
+      dl.href = dataUrl;
+      dl.download = fileName();
+      $('preview').hidden = false;
+      var blob = await toBlob(cv);
+
+      if (!downloads) {
+        setStatus('Imagem gerada. Use o botão "Baixar imagem" ou pressione e segure a prévia.');
+        $('previewNote').textContent = 'O download direto não está disponível aqui. Use o botão "Baixar imagem" ou pressione e segure a imagem para salvar.';
+      } else {
+        try {
+          await downloads.save({ filename: fileName(), data: blob });
+          setStatus('JPG salvo: ' + fileName());
+          $('previewNote').textContent = 'Se o download não iniciar, use o botão abaixo ou pressione e segure a imagem para salvar.';
+        } catch (err) {
+          var code = err && err.code;
+          if (code === 'declined') setStatus('Download cancelado. A imagem continua na prévia abaixo.');
+          else setStatus('Não foi possível iniciar o download. Use o botão abaixo ou salve pela prévia.');
+        }
+      }
+    } catch (e) {
+      setStatus('Não foi possível gerar a imagem. Tente novamente.');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  syncControls();
+  render();
+  (async function () {
+    try {
+      if (window.claude && window.claude.use) downloads = await window.claude.use('downloads');
+    } catch (e) { downloads = null; }
+  })();
+})();
+</script>
+
+</body></html>
